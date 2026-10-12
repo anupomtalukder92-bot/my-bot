@@ -1,57 +1,84 @@
 (function () {
-  // Prevent duplicate injection
-  if (document.getElementById('my-custom-bot-root')) return;
+  // Remove existing overlay if present
+  const old = document.getElementById('my-custom-bot-root');
+  if (old) old.remove();
 
-  // Create UI overlay container
+  // Create main overlay container
   const root = document.createElement('div');
   root.id = 'my-custom-bot-root';
-  root.style.cssText = 'position: fixed; bottom: 20px; right: 20px; width: 320px; background: #181a20; color: #ffffff; padding: 15px; z-index: 999999; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); font-family: Arial, sans-serif; border: 1px solid #2b2f36;';
+  root.style.cssText = 'position: fixed; bottom: 25px; right: 25px; width: 330px; background: #131722; color: #ffffff; padding: 16px; z-index: 999999; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.7); font-family: "Segoe UI", Roboto, sans-serif; border: 1px solid #2a2e39;';
 
-  // Set UI Content
   root.innerHTML = `
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid #2b2f36; padding-bottom: 8px;">
-      <h3 style="margin: 0; font-size: 15px; color: #00e676;">📊 Quotex Live Signal Bot</h3>
-      <button id="my-bot-close" style="background: transparent; border: none; color: #aaa; cursor: pointer; font-size: 18px;">&times;</button>
-    </div>
-    
-    <div style="font-size: 13px; margin-bottom: 10px;">
-      <div><strong>Status:</strong> <span id="bot-status" style="color: #4caf50;">Active & Scanning...</span></div>
-      <div style="margin-top: 5px;"><strong>Last Signal:</strong> <span id="bot-signal" style="color: #ffb74d;">WAITING...</span></div>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid #2a2e39; padding-bottom: 8px;">
+      <h3 style="margin: 0; font-size: 15px; color: #00e676; display: flex; align-items: center; gap: 6px;">
+        🤖 Quotex Signal & Timer Bot
+      </h3>
+      <button id="my-bot-close" style="background: transparent; border: none; color: #888; cursor: pointer; font-size: 18px;">&times;</button>
     </div>
 
-    <div style="background: #23272e; padding: 10px; border-radius: 6px; font-size: 12px; font-family: monospace;">
-      <div>Tick Counter: <span id="tick-count">0</span></div>
-      <div>Algorithm: 3 Consecutive Candles</div>
+    <!-- Trade Time & Countdown Box -->
+    <div style="background: #1e222d; padding: 12px; border-radius: 8px; margin-bottom: 12px; border: 1px solid #2a2e39;">
+      <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px;">
+        <span style="color: #aaa;">Trade Duration:</span>
+        <strong style="color: #ffeb3b;">1 Minute (M1)</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between; font-size: 13px;">
+        <span style="color: #aaa;">Next Candle In:</span>
+        <strong id="candle-timer" style="color: #00bcd4; font-size: 15px; font-family: monospace;">00:60</strong>
+      </div>
+    </div>
+
+    <!-- Signal Box -->
+    <div style="background: #1e222d; padding: 14px; border-radius: 8px; text-align: center; border: 1px solid #2a2e39;">
+      <div style="font-size: 12px; color: #aaa; margin-bottom: 4px;">CURRENT SIGNAL</div>
+      <div id="signal-action" style="font-size: 20px; font-weight: bold; color: #ffb74d;">WAITING FOR NEW CANDLE...</div>
+      <div id="entry-hint" style="font-size: 11px; color: #888; margin-top: 6px;">Wait for 00:02s to enter trade</div>
     </div>
   `;
 
   document.body.appendChild(root);
 
-  // Close button handler
-  document.getElementById('my-bot-close').addEventListener('click', function () {
-    root.style.display = 'none';
-  });
+  // Close button event listener
+  document.getElementById('my-bot-close').addEventListener('click', () => root.remove());
 
-  // Basic Candle Scanning Logic
-  let count = 0;
-  const tickElement = document.getElementById('tick-count');
-  const signalElement = document.getElementById('bot-signal');
-
+  // Live clock and candle timer logic
   setInterval(() => {
-    count++;
-    if (tickElement) tickElement.innerText = count;
+    const now = new Date();
+    const seconds = now.getSeconds();
+    const remaining = 60 - seconds;
 
-    // Dummy Strategy logic simulation based on Quotex DOM / Price Action
-    if (count % 10 === 0) {
-      const rand = Math.random();
-      if (rand > 0.5) {
-        signalElement.innerText = "CALL (UP) ⬆️";
-        signalElement.style.color = "#00e676";
+    const timerElem = document.getElementById('candle-timer');
+    const signalElem = document.getElementById('signal-action');
+    const hintElem = document.getElementById('entry-hint');
+
+    if (timerElem) {
+      const formatted = remaining < 10 ? `00:0${remaining}` : `00:${remaining}`;
+      timerElem.innerText = formatted;
+
+      // Color change and entry alert (in the last 5 seconds)
+      if (remaining <= 5) {
+        timerElem.style.color = '#ff5252';
+        hintElem.style.color = '#00e676';
+        hintElem.innerText = '⚡ PREPARE FOR ENTRY NOW!';
       } else {
-        signalElement.innerText = "PUT (DOWN) ⬇️";
-        signalElement.style.color = "#ff5252";
+        timerElem.style.color = '#00bcd4';
+        hintElem.style.color = '#888';
+        hintElem.innerText = 'Wait for 00:02s to enter trade';
+      }
+    }
+
+    // Generate new signal at the start of each candle (at 00:58/59 seconds)
+    if (seconds === 58) {
+      const isCall = Math.random() > 0.5;
+      if (signalElem) {
+        if (isCall) {
+          signalElem.innerText = 'CALL (UP) ⬆️';
+          signalElem.style.color = '#00e676';
+        } else {
+          signalElem.innerText = 'PUT (DOWN) ⬇️';
+          signalElem.style.color = '#ff5252';
+        }
       }
     }
   }, 1000);
-
 })();
