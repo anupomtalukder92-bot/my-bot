@@ -3,17 +3,20 @@
   const old = document.getElementById('my-custom-bot-root');
   if (old) old.remove();
 
-  // Create main overlay container
+  // Create main overlay container with draggable support
   const root = document.createElement('div');
   root.id = 'my-custom-bot-root';
-  root.style.cssText = 'position: fixed; bottom: 25px; right: 25px; width: 330px; background: #131722; color: #ffffff; padding: 16px; z-index: 999999; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.7); font-family: "Segoe UI", Roboto, sans-serif; border: 1px solid #2a2e39;';
+  root.style.cssText = 'position: fixed; bottom: 25px; right: 25px; width: 330px; background: #131722; color: #ffffff; padding: 16px; z-index: 999999; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.7); font-family: "Segoe UI", Roboto, sans-serif; border: 1px solid #2a2e39; user-select: none;';
 
   root.innerHTML = `
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid #2a2e39; padding-bottom: 8px;">
+    <div id="bot-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid #2a2e39; padding-bottom: 8px; cursor: move;">
       <h3 style="margin: 0; font-size: 15px; color: #00e676; display: flex; align-items: center; gap: 6px;">
-        🤖 Quotex Signal & Timer Bot
+        🤖 Quotex Bot
       </h3>
-      <button id="my-bot-close" style="background: transparent; border: none; color: #888; cursor: pointer; font-size: 18px;">&times;</button>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <button id="bot-toggle-btn" style="background: #00e676; color: #131722; border: none; padding: 4px 10px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 12px;">STOP</button>
+        <button id="my-bot-close" style="background: transparent; border: none; color: #888; cursor: pointer; font-size: 18px;">&times;</button>
+      </div>
     </div>
 
     <!-- Trade Time & Countdown Box -->
@@ -38,24 +41,66 @@
 
   document.body.appendChild(root);
 
+  // --- DRAG AND DROP LOGIC ---
+  let isDragging = false, offsetX = 0, offsetY = 0;
+  const header = document.getElementById('bot-header');
+
+  header.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    offsetX = e.clientX - root.getBoundingClientRect().left;
+    offsetY = e.clientY - root.getBoundingClientRect().top;
+    root.style.position = 'fixed';
+    root.style.bottom = 'auto';
+    root.style.right = 'auto';
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    root.style.left = (e.clientX - offsetX) + 'px';
+    root.style.top = (e.clientY - offsetY) + 'px';
+  });
+
+  document.addEventListener('mouseup', () => { isDragging = false; });
+
   // Close button event listener
   document.getElementById('my-bot-close').addEventListener('click', () => root.remove());
 
+  // --- BOT LOGIC & START/STOP ---
+  let isRunning = true;
+  const toggleBtn = document.getElementById('bot-toggle-btn');
+  const timerElem = document.getElementById('candle-timer');
+  const signalElem = document.getElementById('signal-action');
+  const hintElem = document.getElementById('entry-hint');
+
+  toggleBtn.addEventListener('click', () => {
+    isRunning = !isRunning;
+    if (isRunning) {
+      toggleBtn.innerText = 'STOP';
+      toggleBtn.style.background = '#00e676';
+      toggleBtn.style.color = '#131722';
+    } else {
+      toggleBtn.innerText = 'START';
+      toggleBtn.style.background = '#ff5252';
+      toggleBtn.style.color = '#ffffff';
+      if (signalElem) {
+        signalElem.innerText = 'BOT STOPPED';
+        signalElem.style.color = '#888';
+      }
+    }
+  });
+
   // Live clock and candle timer logic
   setInterval(() => {
+    if (!isRunning) return;
+
     const now = new Date();
     const seconds = now.getSeconds();
     const remaining = 60 - seconds;
-
-    const timerElem = document.getElementById('candle-timer');
-    const signalElem = document.getElementById('signal-action');
-    const hintElem = document.getElementById('entry-hint');
 
     if (timerElem) {
       const formatted = remaining < 10 ? `00:0${remaining}` : `00:${remaining}`;
       timerElem.innerText = formatted;
 
-      // Color change and entry alert (in the last 5 seconds)
       if (remaining <= 5) {
         timerElem.style.color = '#ff5252';
         hintElem.style.color = '#00e676';
@@ -67,7 +112,6 @@
       }
     }
 
-    // Generate new signal at the start of each candle (at 00:58/59 seconds)
     if (seconds === 58) {
       const isCall = Math.random() > 0.5;
       if (signalElem) {
